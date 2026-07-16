@@ -482,7 +482,7 @@
     
     <script>
         // 🚨 สิ่งสำคัญที่สุด: เอาลิงก์ Web App (ที่ได้จาก GAS) มาใส่ในเครื่องหมายคำพูดด้านล่างนี้ 🚨
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyMplCnLFpRoHa2PjRag_ocDAGEJb7rNsujR1i-tASEHo9pj55Vw3GZqK7ckHqY-oBmuA/exec";
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx5UzPTfPYNZWtVbmjPJOZeDGg-YMx-Z4BSWkqCSNcgiQ0RIwZ8PAhQhJ2ZcqzSIp7M/exec";
 
         var allMedia = [];
         var siteSettings = {};
@@ -507,10 +507,18 @@
             try {
                 const response = await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    redirect: 'follow',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: action, payload: payload })
+                    // บังคับ Content-Type เป็น text/plain เพื่อข้ามการตรวจสอบ CORS Preflight ของเบราว์เซอร์
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify({ action: action, payload: payload }),
+                    redirect: 'follow' // จำเป็นต้องมี เพราะ Google Apps Script จะตอบกลับแบบ 302 Redirect
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 return await response.json();
             } catch (error) {
                 console.error("API Error:", error);
