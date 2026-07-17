@@ -308,6 +308,29 @@
             animation: slideUpFade 0.6s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; 
         }
         @keyframes slideUpFade { to { opacity: 1; transform: translateY(0); } }
+
+        /* สไตล์สำหรับปุ่ม Social ใน Footer */
+        .social-icon {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--comedu-pastel);
+            font-size: 1.2rem;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .social-icon:hover {
+            background: var(--comedu-accent);
+            color: white;
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 8px 20px rgba(82, 183, 136, 0.4);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -462,35 +485,28 @@
         </div>
     </div>
 
-      <!-- Footer -->
-  <footer class="custom-footer mt-auto">
-  <div class="container text-center">
+    <footer class="footer mt-auto">
+        <div class="container">
+            <p class="mb-3 fs-6" id="footerText">คลังสื่อครูพี ธีระภัทร l COMEDU66</p>
+            
+            <!-- 🌐 Social Icons -->
+            <div class="d-flex justify-content-center gap-3">
+                <a href="https://web.facebook.com/pee.teerapat.92/" target="_blank" class="social-icon">
+                    <i class="fab fa-facebook-f"></i>
+                </a>
+                <a href="https://www.instagram.com/peetn__?igsh=ZGRrdTA1NHpyMHF6&utm_source=qr" target="_blank" class="social-icon">
+                    <i class="fab fa-instagram"></i>
+                </a>
+                <a href="https://line.me/ti/p/CTWV9KG9aI" target="_blank" class="social-icon">
+                    <i class="fab fa-line"></i>
+                </a>
+                <a href="http://www.youtube.com/@teerapatnetsakorn5259" target="_blank" class="social-icon">
+                    <i class="fab fa-youtube"></i>
+                </a>
+            </div>
+        </div>
+    </footer>
 
-    <p class="mb-3" id="footer-text">คลังสื่อครูพี ธีระภัทร</p>
-
-    <!-- 🌐 Social Icons -->
-    <div class="d-flex justify-content-center gap-3">
-
-      <a href="https://web.facebook.com/pee.teerapat.92/" target="_blank" class="social-icon">
-        <i class="fab fa-facebook-f"></i>
-      </a>
-
-      <a href="https://www.instagram.com/peetn__?igsh=ZGRrdTA1NHpyMHF6&utm_source=qr" target="_blank" class="social-icon">
-        <i class="fab fa-instagram"></i>
-      </a>
-
-      <a href="https://line.me/ti/p/CTWV9KG9aI" target="_blank" class="social-icon">
-        <i class="fab fa-line"></i>
-      </a>
-      
-      <a href="http://www.youtube.com/@teerapatnetsakorn5259" target="_blank" class="social-icon">
-        <i class="fab fa-youtube"></i>
-      </a>
-
-    </div>
-
-  </div>
-</footer>
     <!-- Login Modal -->
     <div class="modal fade" id="loginModal" tabindex="-1">
         <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -690,9 +706,9 @@
     
     <script>
         // ==========================================
-        // ตั้งค่า URL ของ Web App ตรงนี้ (สำคัญมาก!)
+        // ตั้งค่า URL ของ Web App ตรงนี้ (อัปเดตล่าสุด)
         // ==========================================
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbxPNB4xZcbtgDy04zWLmlXsFqLlbBAZsCahusHaYJXPZhdS0L8mUsxLLrqNSzv2vNIw/exec';
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbz6QSss_rZXE8aQFzITSVMQVlKpsdohGTCDTUPxwY8sq99w0gCc3LshVE6WJAb_WCGc/exec';
 
         var allMedia = [];
         var siteSettings = {};
