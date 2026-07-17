@@ -666,6 +666,11 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     
     <script>
+        // ==========================================
+        // ตั้งค่า URL ของ Web App ตรงนี้ (สำคัญมาก!)
+        // ==========================================
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbx5UzPTfPYNZWtVbmjPJOZeDGg-YMx-Z4BSWkqCSNcgiQ0RIwZ8PAhQhJ2ZcqzSIp7M/exec';
+
         var allMedia = [];
         var siteSettings = {};
         var loginModalInstance, mediaModalInstance, settingsModalInstance, viewDetailModalInstance;
@@ -684,10 +689,27 @@
             fetchInitialData();
         });
 
-        // ดึงข้อมูลในรอบเดียวด้วย Batch Data (แก้ปัญหาโหลดช้า)
+        // ----------------------------------------------------
+        // แกนหลักสำหรับติดต่อกับ Backend บน Google Apps Script (ยิงแบบ fetch)
+        // ----------------------------------------------------
+        async function callBackend(action, payload = {}) {
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    // ส่งเป็น string ธรรมดา เพื่อเลี่ยงปัญหา CORS Preflight ใน GitHub
+                    body: JSON.stringify({ action: action, payload: payload })
+                });
+                return await response.json();
+            } catch (error) {
+                console.error("API Error:", error);
+                throw error;
+            }
+        }
+
+        // ดึงข้อมูลในรอบเดียวด้วย Batch Data
         function fetchInitialData() {
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function(res) {
+            callBackend('getInitialAppData')
+                .then(function(res) {
                     siteSettings = res.settings || {};
                     allMedia = Array.isArray(res.media) ? res.media : [];
                     
@@ -696,21 +718,11 @@
                     renderGallery(allMedia);
                     renderAdminTable();
                     document.getElementById('loader').style.display = 'none';
-                }).getInitialAppData();
-            } else {
-                // สำหรับระบบทดสอบ/Preview Mode
-                setTimeout(function() {
-                    siteSettings = { 
-                        SiteName: 'คลังสื่อครูพี ธีระภัทร', 
-                        SiteDesc: 'รวบรวมสื่อการเรียนการสอน ใบงาน เกม และความรู้มากมาย (ข้อมูลจำลองสำหรับ Preview)', 
-                        FooterText: 'คลังสื่อครูพี ธีระภัทร l COMEDU66', 
-                        AdminPassword: '1234' 
-                    };
-                    allMedia = [];
-                    applySettings(); updateStats(); renderGallery(allMedia); renderAdminTable();
+                })
+                .catch(function(err) {
+                    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบลิงก์ GAS_URL', 'error');
                     document.getElementById('loader').style.display = 'none';
-                }, 800);
-            }
+                });
         }
 
         // นำการตั้งค่าไปใช้กับหน้าเว็บและเซ็ตค่าเริ่มต้น
@@ -749,8 +761,8 @@
             if(!pass) return Swal.fire('แจ้งเตือน', 'กรุณากรอกรหัสผ่าน', 'warning');
             Swal.showLoading();
             
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function(res) {
+            callBackend('checkAdminLogin', { password: String(pass) })
+                .then(function(res) {
                     if(res.success) {
                         Swal.fire({icon: 'success', title: 'สำเร็จ', text: res.message, timer: 1500, showConfirmButton: false});
                         sessionStorage.setItem('adminLogged', 'true');
@@ -763,23 +775,8 @@
                     } else {
                         Swal.fire('ข้อผิดพลาด', res.message, 'error');
                     }
-                }).checkAdminLogin(String(pass));
-            } else {
-                setTimeout(function() {
-                    if (String(pass) === '1234' || String(pass).trim() === String(siteSettings['AdminPassword']).trim()) {
-                        Swal.fire({icon: 'success', title: 'สำเร็จ', text: 'เข้าสู่ระบบสำเร็จ', timer: 1500, showConfirmButton: false});
-                        sessionStorage.setItem('adminLogged', 'true');
-                        loginModalInstance.hide();
-                        document.getElementById('adminPassword').value = '';
-                        document.getElementById('btnAdminLogin').classList.add('d-none');
-                        document.getElementById('adminMenu').classList.remove('d-none');
-                        document.getElementById('adminMenu').classList.add('d-flex');
-                        switchView('admin');
-                    } else {
-                        Swal.fire('ข้อผิดพลาด', 'รหัสผ่านไม่ถูกต้อง', 'error');
-                    }
-                }, 500);
-            }
+                })
+                .catch(function(err) { Swal.fire('ระบบขัดข้อง', err.message, 'error'); });
         }
 
         function logout() {
@@ -802,6 +799,9 @@
             }
         }
 
+        // =====================================
+        // ฟังก์ชันอรรถประโยชน์จากระบบเดิมทั้งหมด
+        // =====================================
         function updateStats() {
             if (!Array.isArray(allMedia)) { allMedia = []; }
             
@@ -810,12 +810,11 @@
             var docs = allMedia.filter(function(m) { return ['ใบงาน', 'เอกสาร PDF', 'PowerPoint'].indexOf(m.Category) > -1; }).length;
             var vids = allMedia.filter(function(m) { return m.Category === 'วิดีโอ'; }).length;
 
-            // ปรับสีการ์ดให้หลากหลาย มีมิติ และเข้ากับพื้นหลังสีเขียวพาสเทล
             var statData = [
-                { title: 'สื่อทั้งหมด', count: total, color: 'linear-gradient(135deg, #8E54E9, #6a35c9)', icon: 'fa-boxes' },       // ปรับเป็นโทนสีม่วงครามตามที่รีเควส
-                { title: 'เกมการศึกษา', count: games, color: 'linear-gradient(135deg, #d97706, #fbbf24)', icon: 'fa-gamepad' },    // สีส้มทอง (สนุกสนาน)
-                { title: 'เอกสาร/สไลด์', count: docs, color: 'linear-gradient(135deg, #0369a1, #38bdf8)', icon: 'fa-file-alt' },   // สีฟ้าน้ำทะเล (วิชาการ สบายตา)
-                { title: 'วิดีโอ', count: vids, color: 'linear-gradient(135deg, #6d28d9, #a78bfa)', icon: 'fa-video' }              // สีม่วง (สร้างสรรค์ มัลติมีเดีย)
+                { title: 'สื่อทั้งหมด', count: total, color: 'linear-gradient(135deg, #8E54E9, #6a35c9)', icon: 'fa-boxes' },
+                { title: 'เกมการศึกษา', count: games, color: 'linear-gradient(135deg, #d97706, #fbbf24)', icon: 'fa-gamepad' },
+                { title: 'เอกสาร/สไลด์', count: docs, color: 'linear-gradient(135deg, #0369a1, #38bdf8)', icon: 'fa-file-alt' },
+                { title: 'วิดีโอ', count: vids, color: 'linear-gradient(135deg, #6d28d9, #a78bfa)', icon: 'fa-video' }
             ];
 
             var html = '';
@@ -831,13 +830,11 @@
             document.getElementById('statCards').innerHTML = html;
         }
 
-        // แปลงลิงก์ Drive ให้แสดงรูปได้โดยตรง (Thumbnail API)
         function formatImageUrl(url) {
             if (!url) return '';
             if (url.indexOf('drive.google.com') > -1) {
                 var match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
                 if (match && match[1]) {
-                    // ใช้ Thumbnail API เพื่อให้ภาพโหลดขึ้นแน่นอน
                     return 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w1000';
                 }
             }
@@ -881,8 +878,6 @@
                 var likes = parseInt(item.Likes) || 0;
                 var isLiked = localStorage.getItem('liked_' + item.rowIndex) === 'true';
                 var likeClass = isLiked ? 'like-btn liked' : 'like-btn';
-
-                // สร้างดีเลย์ให้การ์ดเด้งขึ้นมาทีละใบ (ห่างกัน 0.08 วินาที)
                 var animDelay = (index * 0.08) + 's';
 
                 finalHtml += 
@@ -1044,7 +1039,6 @@
             mediaModalInstance.show();
         }
 
-        // แปลงไฟล์เป็น Base64
         function getBase64(file) {
             return new Promise(function(resolve, reject) {
                 var reader = new FileReader();
@@ -1053,6 +1047,10 @@
                 reader.readAsDataURL(file);
             });
         }
+
+        // =====================================
+        // ฟังก์ชันอัปเดตและบันทึกข้อมูล (ใช้ callBackend)
+        // =====================================
 
         function handleSaveMedia() {
             if(!document.getElementById('formTitle').value) return Swal.fire('เตือน', 'กรุณากรอกชื่อสื่อ', 'warning');
@@ -1109,8 +1107,8 @@
         }
 
         function submitMediaData(data, btn) {
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function(res) {
+            callBackend('saveMedia', data)
+                .then(function(res) {
                     btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-2"></i> บันทึกข้อมูล';
                     if (res.success) {
                         Swal.fire('สำเร็จ', res.message, 'success');
@@ -1118,15 +1116,11 @@
                         document.getElementById('loader').style.display = 'flex';
                         fetchInitialData(); 
                     } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
-                }).saveMedia(data);
-            } else {
-                setTimeout(function() {
+                })
+                .catch(function(err) {
                     btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-2"></i> บันทึกข้อมูล';
-                    Swal.fire('สำเร็จ', 'บันทึกข้อมูลเรียบร้อยแล้ว (จำลอง)', 'success');
-                    mediaModalInstance.hide();
-                    fetchInitialData();
-                }, 1000);
-            }
+                    Swal.fire('ระบบขัดข้อง', err.message, 'error');
+                });
         }
 
         function deleteMedia(rowIndex) {
@@ -1137,14 +1131,12 @@
             }).then(function(result) {
                 if (result.isConfirmed) {
                     Swal.showLoading();
-                    if (typeof google !== 'undefined' && google.script) {
-                        google.script.run.withSuccessHandler(function(res) {
+                    callBackend('deleteMedia', { rowIndex: rowIndex })
+                        .then(function(res) {
                             if(res.success) { Swal.fire('ลบแล้ว!', res.message, 'success'); fetchInitialData(); } 
                             else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
-                        }).deleteMedia(rowIndex);
-                    } else {
-                        setTimeout(function() { Swal.fire('ลบแล้ว!', 'ลบเรียบร้อยแล้ว', 'success'); fetchInitialData(); }, 500);
-                    }
+                        })
+                        .catch(function(err) { Swal.fire('ระบบขัดข้อง', err.message, 'error'); });
                 }
             });
         }
@@ -1165,24 +1157,23 @@
                 countSpan.innerText = currentLikes + 1;
                 localStorage.setItem('liked_' + rowIndex, 'true');
             }
-            // แจ้งหลังบ้านให้ปรับยอด Like (ทำงานเบื้องหลัง)
-            if (typeof google !== 'undefined' && google.script) { 
-                google.script.run.toggleLikeMedia(rowIndex, !isLiked); 
-            }
+            
+            // ส่งค่าไปหลังบ้านเบื้องหลัง
+            callBackend('toggleLikeMedia', { rowIndex: rowIndex, isLiking: !isLiked }); 
         }
 
         function adminTogglePin(rowIndex) {
             Swal.showLoading();
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function(res) {
+            callBackend('togglePinStatus', { rowIndex: rowIndex })
+                .then(function(res) {
                     if (res.success) { 
                         Swal.fire({icon: 'success', title: 'สำเร็จ', text: res.message, timer: 1500, showConfirmButton: false}); 
                         fetchInitialData(); 
                     } else { 
                         Swal.fire('ข้อผิดพลาด', res.message, 'error'); 
                     }
-                }).togglePinStatus(rowIndex);
-            }
+                })
+                .catch(function(err) { Swal.fire('ระบบขัดข้อง', err.message, 'error'); });
         }
 
         function openSettingsModal() { settingsModalInstance.show(); }
@@ -1203,8 +1194,8 @@
             var fLogo = document.getElementById('setSiteLogo').files[0];
             
             var saveFunc = function(data) {
-                if (typeof google !== 'undefined' && google.script) {
-                    google.script.run.withSuccessHandler(function(res) {
+                callBackend('saveSettings', data)
+                    .then(function(res) {
                         btn.disabled = false; btn.innerHTML = 'บันทึกการตั้งค่า';
                         if(res.success) {
                             Swal.fire('สำเร็จ', res.message, 'success');
@@ -1216,8 +1207,11 @@
                             settingsModalInstance.hide(); 
                             document.getElementById('setSiteLogo').value = '';
                         } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
-                    }).saveSettings(data);
-                }
+                    })
+                    .catch(function(err) { 
+                        btn.disabled = false; btn.innerHTML = 'บันทึกการตั้งค่า';
+                        Swal.fire('ระบบขัดข้อง', err.message, 'error'); 
+                    });
             };
             
             if (fLogo) {
@@ -1241,3 +1235,5 @@
     </script>
 </body>
 </html>
+
+คัดลอกทั้งหมดนี้ไปใส่ใน `index.html` แล้วทดสอบได้เลยครับ!
