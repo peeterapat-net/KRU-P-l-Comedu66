@@ -731,17 +731,32 @@
         // ----------------------------------------------------
         // แกนหลักสำหรับติดต่อกับ Backend บน Google Apps Script (ยิงแบบ fetch)
         // ----------------------------------------------------
-        async function callBackend(action, payload = {}) {
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    // ส่งเป็น string ธรรมดา เพื่อเลี่ยงปัญหา CORS Preflight ใน GitHub
-                    body: JSON.stringify({ action: action, payload: payload })
-                });
-                return await response.json();
-            } catch (error) {
-                console.error("API Error:", error);
-                throw error;
+        async function callBackend(action, payload = {}, retries = 2) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(GAS_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'text/plain;charset=utf-8' // ป้องกันปัญหา CORS จากเบราว์เซอร์
+                        },
+                        body: JSON.stringify({ action: action, payload: payload })
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const text = await response.text();
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error("Invalid JSON response:", text);
+                        throw new Error("เซิร์ฟเวอร์ตอบกลับผิดพลาด");
+                    }
+                } catch (error) {
+                    console.error(`API Error (Attempt ${i + 1}):`, error);
+                    if (i === retries - 1) throw error;
+                    // รอ 1 วินาทีก่อนพยายามส่งข้อมูลอีกครั้ง (ป้องกัน GAS ปฏิเสธคำขอที่ถี่เกินไป)
+                    await new Promise(r => setTimeout(r, 1000));
+                }
             }
         }
 
@@ -1150,10 +1165,11 @@
                 .then(function(res) {
                     btn.disabled = false; btn.innerHTML = '<i class="fas fa-save me-2"></i> บันทึกข้อมูล';
                     if (res.success) {
-                        Swal.fire('สำเร็จ', res.message, 'success');
                         mediaModalInstance.hide();
+                        Swal.fire({icon: 'success', title: 'สำเร็จ', text: res.message, timer: 1500, showConfirmButton: false});
                         document.getElementById('loader').style.display = 'flex';
-                        fetchInitialData(); 
+                        // หน่วงเวลา 1.5 วินาที ให้ฐานข้อมูลบันทึกสำเร็จก่อนดึงข้อมูลใหม่
+                        setTimeout(() => fetchInitialData(), 1500); 
                     } else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
                 })
                 .catch(function(err) {
@@ -1172,7 +1188,11 @@
                     Swal.showLoading();
                     callBackend('deleteMedia', { rowIndex: rowIndex })
                         .then(function(res) {
-                            if(res.success) { Swal.fire('ลบแล้ว!', res.message, 'success'); fetchInitialData(); } 
+                            if(res.success) { 
+                                Swal.fire({icon: 'success', title: 'ลบแล้ว!', text: res.message, timer: 1500, showConfirmButton: false});
+                                document.getElementById('loader').style.display = 'flex';
+                                setTimeout(() => fetchInitialData(), 1500);
+                            } 
                             else { Swal.fire('ข้อผิดพลาด', res.message, 'error'); }
                         })
                         .catch(function(err) { Swal.fire('ระบบขัดข้อง', err.message, 'error'); });
@@ -1207,7 +1227,8 @@
                 .then(function(res) {
                     if (res.success) { 
                         Swal.fire({icon: 'success', title: 'สำเร็จ', text: res.message, timer: 1500, showConfirmButton: false}); 
-                        fetchInitialData(); 
+                        document.getElementById('loader').style.display = 'flex';
+                        setTimeout(() => fetchInitialData(), 1500); 
                     } else { 
                         Swal.fire('ข้อผิดพลาด', res.message, 'error'); 
                     }
